@@ -1,0 +1,977 @@
+Ôr@Ÿªassertions¤code´customTransformCache¬dependencies¢id¤meta±moduleSideEffects¬originalCode±originalSourcemap«resolvedIds®sourcemapChainµsyntheticNamedExportsµtransformDependencies®transformFiles¨cacheAstÔrAÚSºif (!("finalizeConstruction" in ViewPU.prototype)) {
+    Reflect.set(ViewPU.prototype, "finalizeConstruction", () => { });
+}
+// USBManagerPage.ets
+// ä½¿ç”¨å®˜æ–¹æ¨èçš„ usbManagerï¼ˆSystemCapability.USB.USBManagerï¼‰
+import usbManager from "@ohos.usbManager";
+class USBManagerPage extends ViewPU {
+    constructor(parent, params, __localStorage, elmtId = -1, paramsLambda = undefined, extraInfo) {
+        super(parent, __localStorage, elmtId, extraInfo);
+        if (typeof paramsLambda === "function") {
+            this.paramsGenerator_ = paramsLambda;
+        }
+        this.__uiDevices = new ObservedPropertyObjectPU([], this, "uiDevices");
+        this.realDevices = [];
+        this.__logText = new ObservedPropertySimplePU('ç‚¹å‡»ä¸‹æ–¹æŒ‰é’®æ‰«æ USB è®¾å¤‡', this, "logText");
+        this.__mockMode = new ObservedPropertySimplePU(true, this, "mockMode");
+        this.scanTimer = undefined;
+        this.lastDeviceCount = 0;
+        this.setInitiallyProvidedValue(params);
+        this.finalizeConstruction();
+    }
+    setInitiallyProvidedValue(params) {
+        if (params.uiDevices !== undefined) {
+            this.uiDevices = params.uiDevices;
+        }
+        if (params.realDevices !== undefined) {
+            this.realDevices = params.realDevices;
+        }
+        if (params.logText !== undefined) {
+            this.logText = params.logText;
+        }
+        if (params.mockMode !== undefined) {
+            this.mockMode = params.mockMode;
+        }
+        if (params.scanTimer !== undefined) {
+            this.scanTimer = params.scanTimer;
+        }
+        if (params.lastDeviceCount !== undefined) {
+            this.lastDeviceCount = params.lastDeviceCount;
+        }
+    }
+    updateStateVars(params) {
+    }
+    purgeVariableDependenciesOnElmtId(rmElmtId) {
+        this.__uiDevices.purgeDependencyOnElmtId(rmElmtId);
+        this.__logText.purgeDependencyOnElmtId(rmElmtId);
+        this.__mockMode.purgeDependencyOnElmtId(rmElmtId);
+    }
+    aboutToBeDeleted() {
+        this.__uiDevices.aboutToBeDeleted();
+        this.__logText.aboutToBeDeleted();
+        this.__mockMode.aboutToBeDeleted();
+        SubscriberManager.Get().delete(this.id__());
+        this.aboutToBeDeletedInternal();
+    }
+    get uiDevices() {
+        return this.__uiDevices.get();
+    }
+    set uiDevices(newValue) {
+        this.__uiDevices.set(newValue);
+    }
+    get logText() {
+        return this.__logText.get();
+    }
+    set logText(newValue) {
+        this.__logText.set(newValue);
+    }
+    get mockMode() {
+        return this.__mockMode.get();
+    }
+    set mockMode(newValue) {
+        this.__mockMode.set(newValue);
+    }
+    // é¡µé¢å³å°†æ˜¾ç¤º
+    aboutToAppear() {
+        // é¦–æ¬¡æ‰«æ
+        this.refreshUsbDevices();
+        // å¯åŠ¨ 2 ç§’ä¸€æ¬¡çš„è½®è¯¢æ‰«æ
+        this.startPeriodicScan();
+    }
+    // é¡µé¢é”€æ¯ï¼Œæ¸…ç†å®šæ—¶å™¨
+    aboutToDisappear() {
+        if (this.scanTimer !== undefined) {
+            clearInterval(this.scanTimer);
+            this.scanTimer = undefined;
+        }
+    }
+    /**
+     * å¯åŠ¨å®šæ—¶æ‰«æï¼ˆæ¯ 2 ç§’åˆ·æ–°ä¸€æ¬¡ USB è®¾å¤‡åˆ—è¡¨ï¼‰
+     */
+    startPeriodicScan() {
+        // é¿å…é‡å¤å¼€å¯å¤šä¸ªå®šæ—¶å™¨
+        if (this.scanTimer !== undefined) {
+            clearInterval(this.scanTimer);
+        }
+        this.scanTimer = setInterval(() => {
+            this.refreshUsbDevices();
+        }, 2000);
+    }
+    /**
+     * åˆ·æ–° USB è®¾å¤‡åˆ—è¡¨
+     * è°ƒç”¨å®˜æ–¹ APIï¼šusbManager.getDevices()
+     */
+    refreshUsbDevices() {
+        try {
+            const devices = usbManager.getDevices();
+            this.realDevices = devices ? [...devices] : [];
+            const uiList = [];
+            // å…ˆæŠŠçœŸå®è®¾å¤‡æ˜ å°„æˆ ViewModel
+            this.realDevices.forEach((dev) => {
+                uiList.push({
+                    name: dev.productName ?? dev.name ?? 'æœªçŸ¥è®¾å¤‡',
+                    vendorId: dev.vendorId ?? 0,
+                    productId: dev.productId ?? 0,
+                    clazz: dev.clazz?.toString() ?? 'æœªçŸ¥',
+                    protocol: dev.protocol?.toString() ?? 'æœªçŸ¥',
+                    subClass: dev.subClass?.toString() ?? 'æœªçŸ¥',
+                    version: dev.version ?? 'æœªçŸ¥',
+                    busNum: (dev.busNum ?? 0).toString(),
+                    devAddress: (dev.devAddress ?? 0).toString(),
+                    isMock: false
+                });
+            });
+            // å¦‚æœå¼€å¯è™šæ‹Ÿæ¨¡å¼ï¼Œæˆ–è€…çœŸå®è®¾å¤‡ä¸ºç©ºï¼Œå°±è¿½åŠ è™šæ‹Ÿè®¾å¤‡
+            if (this.mockMode || uiList.length === 0) {
+                const mocks = this.buildMockDevices();
+                uiList.push(...mocks);
+            }
+            // æ›´æ–° UI åˆ—è¡¨
+            this.uiDevices = uiList;
+            // æ—¥å¿—åªé’ˆå¯¹çœŸå®è®¾å¤‡æ•°é‡ï¼ˆè™šæ‹Ÿçš„ä¸ç®—ï¼‰
+            const currentRealCount = this.realDevices.length;
+            if (this.lastDeviceCount === 0) {
+                this.logText = `æ‰«æå®Œæˆï¼Œå½“å‰æ£€æµ‹åˆ° ${currentRealCount} ä¸ªçœŸå® USB è®¾å¤‡ï¼ˆè™šæ‹Ÿè®¾å¤‡ä¸è®¡å…¥æ•°é‡ï¼‰`;
+            }
+            else if (currentRealCount > this.lastDeviceCount) {
+                this.logText = `æ£€æµ‹åˆ°çœŸå® USB è®¾å¤‡æ’å…¥ï¼Œå½“å‰å…± ${currentRealCount} ä¸ªè®¾å¤‡`;
+            }
+            else if (currentRealCount < this.lastDeviceCount) {
+                this.logText = `æ£€æµ‹åˆ°çœŸå® USB è®¾å¤‡æ‹”å‡ºï¼Œå½“å‰å…± ${currentRealCount} ä¸ªè®¾å¤‡`;
+            }
+            this.lastDeviceCount = currentRealCount;
+        }
+        catch (err) {
+            const error = err;
+            this.logText = `è·å– USB è®¾å¤‡åˆ—è¡¨å¤±è´¥: ${error.message ?? JSON.stringify(error)}`;
+        }
+    }
+    /**
+     * æµ‹è¯•å•ä¸ª USB è®¾å¤‡
+     * æµç¨‹ï¼š
+     * 1. æ£€æŸ¥ / è¯·æ±‚è®¿é—®æƒé™ï¼ˆusbManager.hasRight / requestRightï¼‰
+     * 2. connectDevice è·å–ç®¡é“ï¼ˆpipeï¼‰
+     * 3. getRawDescriptor è¯»å–åŸå§‹æè¿°ç¬¦ï¼Œåšç®€å•æ ¡éªŒ
+     * 4. å…³é—­ pipe
+     */
+    async testRealDevice(device) {
+        let pipe = undefined;
+        const deviceName = device.name ?? '';
+        try {
+            if (!deviceName) {
+                this.logText = 'ç›®æ ‡è®¾å¤‡çš„ name ä¸ºç©ºï¼Œæ— æ³•ç”³è¯·æƒé™';
+                return;
+            }
+            let hasRight = false;
+            try {
+                hasRight = usbManager.hasRight(deviceName);
+            }
+            catch (err) {
+                const error = err;
+                this.logText = `æ£€æŸ¥è®¾å¤‡[${deviceName}]æƒé™å¤±è´¥: ${error.message ?? JSON.stringify(error)}`;
+                return;
+            }
+            if (!hasRight) {
+                try {
+                    hasRight = await usbManager.requestRight(deviceName);
+                }
+                catch (err) {
+                    const error = err;
+                    this.logText = `ç”³è¯·è®¾å¤‡[${deviceName}]æƒé™å¤±è´¥: ${error.message ?? JSON.stringify(error)}`;
+                    return;
+                }
+            }
+            if (!hasRight) {
+                this.logText = `ç”¨æˆ·æœªæˆäºˆè®¾å¤‡[${deviceName}]çš„è®¿é—®æƒé™`;
+                return;
+            }
+            this.logText = `å·²è·å¾—è®¾å¤‡[${deviceName}]è®¿é—®æƒé™ï¼Œå¼€å§‹æµ‹è¯•...`;
+            pipe = usbManager.connectDevice(device);
+            this.logText = `è®¾å¤‡[${deviceName}]å·²è¿æ¥ï¼Œbus=${pipe.busNum}, addr=${pipe.devAddress}ï¼Œå¼€å§‹è¯»å–æè¿°ç¬¦...`;
+            const rawDesc = usbManager.getRawDescriptor(pipe);
+            if (!rawDesc || rawDesc.length === 0) {
+                this.logText = `è®¾å¤‡[${deviceName}]è¿”å›çš„æè¿°ç¬¦ä¸ºç©ºï¼Œå¯èƒ½ä¸æ”¯æŒæ ‡å‡†æè¿°ç¬¦è¯»å–`;
+                return;
+            }
+            const bLength = rawDesc[0];
+            const bDescriptorType = rawDesc[1];
+            const bcdUsb = (rawDesc[3] << 8) | rawDesc[2];
+            this.logText =
+                `è®¾å¤‡[${deviceName}]æµ‹è¯•æˆåŠŸï¼š` +
+                    `åŸå§‹æè¿°ç¬¦é•¿åº¦ ${rawDesc.length} å­—èŠ‚ï¼›` +
+                    `bLength=${bLength}ï¼ŒbDescriptorType=${bDescriptorType}ï¼ŒUSBç‰ˆæœ¬=0x${bcdUsb.toString(16)}`;
+        }
+        catch (err) {
+            const error = err;
+            this.logText = `æµ‹è¯•è®¾å¤‡[${deviceName}]å¤±è´¥: ${error.message ?? JSON.stringify(error)}`;
+        }
+        finally {
+            if (pipe !== undefined) {
+                try {
+                    usbManager.closePipe(pipe);
+                }
+                catch (e) {
+                    console.error(`å…³é—­è®¾å¤‡[${deviceName}]å¤±è´¥: ${JSON.stringify(e)}`);
+                }
+            }
+        }
+    }
+    async testMockDevice(dev) {
+        // æ¨¡æ‹Ÿæµ‹è¯•è€—æ—¶
+        await new Promise(resolve => setTimeout(resolve, 500));
+        if (dev.name.indexOf('æ— æ³•è¯†åˆ«') >= 0) {
+            this.logText =
+                `è™šæ‹Ÿè®¾å¤‡[${dev.name}]ï¼šè®¾å¤‡æè¿°ç¬¦æ— æ³•è§£æã€‚\n` +
+                    `å»ºè®®ï¼š\n` +
+                    `1. æ£€æŸ¥è®¾å¤‡æ˜¯å¦ä¸ºæ ‡å‡† USB è®¾å¤‡ï¼›\n` +
+                    `2. å°è¯•åœ¨å…¶ä»–ç«¯å£ / ç”µè„‘ä¸ŠéªŒè¯è®¾å¤‡æ˜¯å¦æ­£å¸¸ï¼›\n` +
+                    `3. å¦‚æœæ˜¯è‡ªå®šä¹‰è®¾å¤‡ï¼Œç¡®è®¤å›ºä»¶æ˜¯å¦æ­£ç¡®å®ç° USB æè¿°ç¬¦ã€‚`;
+        }
+        else if (dev.name.indexOf('è¯»å†™å¼‚å¸¸') >= 0) {
+            this.logText =
+                `è™šæ‹Ÿè®¾å¤‡[${dev.name}]ï¼šæ§åˆ¶ä¼ è¾“/æ‰¹é‡ä¼ è¾“å‡ºç°è¶…æ—¶æˆ–é”™è¯¯ã€‚\n` +
+                    `å»ºè®®ï¼š\n` +
+                    `1. æ£€æŸ¥ USB çº¿ç¼†ã€ç”µæºä¾›ç»™æ˜¯å¦ç¨³å®šï¼›\n` +
+                    `2. é™ä½ä¼ è¾“é€Ÿåº¦æˆ–ç¼©å°å•æ¬¡ä¼ è¾“æ•°æ®é‡ï¼›\n` +
+                    `3. åœ¨é©±åŠ¨ç«¯å¢åŠ è¶…æ—¶é‡è¯•å’Œé”™è¯¯ç ä¸ŠæŠ¥ã€‚`;
+        }
+        else {
+            this.logText =
+                `è™šæ‹Ÿè®¾å¤‡[${dev.name}]ï¼šæµ‹è¯•é€šè¿‡ï¼Œæ¨¡æ‹Ÿè¯»å†™é€Ÿç‡ 30 MB/sï¼Œé”™è¯¯ç‡ 0%ã€‚\n` +
+                    `å¯è®¤ä¸ºå½“å‰ USB ç®¡ç†å·¥å…·åœ¨æ­£å¸¸è®¾å¤‡åœºæ™¯ä¸‹å·¥ä½œæ­£å¸¸ã€‚`;
+        }
+    }
+    async testDevice(item) {
+        if (item.isMock) {
+            await this.testMockDevice(item);
+            return;
+        }
+        // æ ¹æ® vendorId/productId/name æ‰¾åˆ°å¯¹åº”çœŸå® USBDevice
+        const origin = this.realDevices.find(d => (d.vendorId ?? 0) === item.vendorId &&
+            (d.productId ?? 0) === item.productId &&
+            (d.productName ?? d.name ?? '') === item.name);
+        if (!origin) {
+            this.logText = `æœªåœ¨çœŸå®è®¾å¤‡åˆ—è¡¨ä¸­æ‰¾åˆ° [${item.name}]ï¼Œæ— æ³•æ‰§è¡ŒçœŸå®æµ‹è¯•`;
+            return;
+        }
+        await this.testRealDevice(origin);
+    }
+    /**
+     * æ„é€ è™šæ‹Ÿ USB ç«¯å£/è®¾å¤‡åˆ—è¡¨ï¼Œç”¨äºåœ¨æ— çœŸå®ç¡¬ä»¶æ—¶æµ‹è¯• UI å’Œé€»è¾‘
+     */
+    buildMockDevices() {
+        return [
+            {
+                name: 'ç«¯å£1: è™šæ‹ŸUç›˜',
+                vendorId: 0x1234,
+                productId: 0x0001,
+                clazz: 'MassStorage(0x08)',
+                protocol: 'Bulk-Only',
+                subClass: 'SCSI(0x06)',
+                version: '2.0',
+                busNum: '1',
+                devAddress: '2',
+                isMock: true
+            },
+            {
+                name: 'ç«¯å£2: è™šæ‹Ÿé”®ç›˜',
+                vendorId: 0x1234,
+                productId: 0x0002,
+                clazz: 'HID(0x03)',
+                protocol: 'Keyboard',
+                subClass: 'Boot(0x01)',
+                version: '1.1',
+                busNum: '1',
+                devAddress: '3',
+                isMock: true
+            },
+            {
+                name: 'ç«¯å£3: æ— æ³•è¯†åˆ«çš„è®¾å¤‡',
+                vendorId: 0xFFFF,
+                productId: 0x0003,
+                clazz: 'Unknown(0xFF)',
+                protocol: 'VendorSpecific',
+                subClass: 'Unknown',
+                version: '2.0',
+                busNum: '2',
+                devAddress: '1',
+                isMock: true
+            },
+            {
+                name: 'ç«¯å£4: è¯»å†™å¼‚å¸¸è®¾å¤‡',
+                vendorId: 0x1234,
+                productId: 0x0004,
+                clazz: 'MassStorage(0x08)',
+                protocol: 'Bulk-Only',
+                subClass: 'SCSI(0x06)',
+                version: '2.0',
+                busNum: '2',
+                devAddress: '2',
+                isMock: true
+            }
+        ];
+    }
+    initialRender() {
+        this.observeComponentCreation2((elmtId, isInitialRender) => {
+            Column.create({ space: 12 });
+            Column.padding(16);
+            Column.width('100%');
+            Column.height('100%');
+            Column.backgroundColor('#FFFFFF');
+        }, Column);
+        this.observeComponentCreation2((elmtId, isInitialRender) => {
+            // æ ‡é¢˜
+            Text.create('USB è®¾å¤‡ç®¡ç†å·¥å…·');
+            // æ ‡é¢˜
+            Text.fontSize(24);
+            // æ ‡é¢˜
+            Text.fontWeight(FontWeight.Bold);
+            // æ ‡é¢˜
+            Text.margin({ top: 16 });
+        }, Text);
+        // æ ‡é¢˜
+        Text.pop();
+        this.observeComponentCreation2((elmtId, isInitialRender) => {
+            // æ‰‹åŠ¨æ‰«ææŒ‰é’®
+            Button.createWithLabel('æ‰‹åŠ¨æ‰«æ USB è®¾å¤‡');
+            // æ‰‹åŠ¨æ‰«ææŒ‰é’®
+            Button.backgroundColor('#007DFF');
+            // æ‰‹åŠ¨æ‰«ææŒ‰é’®
+            Button.fontColor(Color.White);
+            // æ‰‹åŠ¨æ‰«ææŒ‰é’®
+            Button.onClick(() => {
+                this.refreshUsbDevices();
+            });
+        }, Button);
+        // æ‰‹åŠ¨æ‰«ææŒ‰é’®
+        Button.pop();
+        this.observeComponentCreation2((elmtId, isInitialRender) => {
+            // è™šæ‹Ÿè®¾å¤‡æµ‹è¯•å¼€å…³æŒ‰é’®ï¼ˆæ³¨æ„ï¼šåœ¨ Column é‡Œé¢ï¼‰
+            Button.createWithLabel(this.mockMode ? 'å…³é—­è™šæ‹Ÿè®¾å¤‡æµ‹è¯•' : 'å¼€å¯è™šæ‹Ÿè®¾å¤‡æµ‹è¯•');
+            // è™šæ‹Ÿè®¾å¤‡æµ‹è¯•å¼€å…³æŒ‰é’®ï¼ˆæ³¨æ„ï¼šåœ¨ Column é‡Œé¢ï¼‰
+            Button.margin({ top: 8 });
+            // è™šæ‹Ÿè®¾å¤‡æµ‹è¯•å¼€å…³æŒ‰é’®ï¼ˆæ³¨æ„ï¼šåœ¨ Column é‡Œé¢ï¼‰
+            Button.backgroundColor('#999999');
+            // è™šæ‹Ÿè®¾å¤‡æµ‹è¯•å¼€å…³æŒ‰é’®ï¼ˆæ³¨æ„ï¼šåœ¨ Column é‡Œé¢ï¼‰
+            Button.fontColor(Color.White);
+            // è™šæ‹Ÿè®¾å¤‡æµ‹è¯•å¼€å…³æŒ‰é’®ï¼ˆæ³¨æ„ï¼šåœ¨ Column é‡Œé¢ï¼‰
+            Button.onClick(() => {
+                this.mockMode = !this.mockMode;
+                this.refreshUsbDevices();
+            });
+        }, Button);
+        // è™šæ‹Ÿè®¾å¤‡æµ‹è¯•å¼€å…³æŒ‰é’®ï¼ˆæ³¨æ„ï¼šåœ¨ Column é‡Œé¢ï¼‰
+        Button.pop();
+        this.observeComponentCreation2((elmtId, isInitialRender) => {
+            // æ—¥å¿—æ˜¾ç¤º
+            Text.create(this.logText);
+            // æ—¥å¿—æ˜¾ç¤º
+            Text.fontSize(14);
+            // æ—¥å¿—æ˜¾ç¤º
+            Text.fontColor(Color.Grey);
+            // æ—¥å¿—æ˜¾ç¤º
+            Text.maxLines(4);
+            // æ—¥å¿—æ˜¾ç¤º
+            Text.textOverflow({ overflow: TextOverflow.Ellipsis });
+            // æ—¥å¿—æ˜¾ç¤º
+            Text.margin({ top: 8, bottom: 8 });
+        }, Text);
+        // æ—¥å¿—æ˜¾ç¤º
+        Text.pop();
+        this.observeComponentCreation2((elmtId, isInitialRender) => {
+            // è®¾å¤‡åˆ—è¡¨ï¼ˆæ³¨æ„ä½¿ç”¨ uiDevices æˆ–ä½ å½“å‰çš„æ•°ç»„ï¼‰
+            List.create();
+            // è®¾å¤‡åˆ—è¡¨ï¼ˆæ³¨æ„ä½¿ç”¨ uiDevices æˆ–ä½ å½“å‰çš„æ•°ç»„ï¼‰
+            List.height('60%');
+            // è®¾å¤‡åˆ—è¡¨ï¼ˆæ³¨æ„ä½¿ç”¨ uiDevices æˆ–ä½ å½“å‰çš„æ•°ç»„ï¼‰
+            List.divider({ strokeWidth: 1, color: '#EEEEEE' });
+        }, List);
+        this.observeComponentCreation2((elmtId, isInitialRender) => {
+            ForEach.create();
+            const forEachItemGenFunction = _item => {
+                const dev = _item;
+                {
+                    const itemCreation = (elmtId, isInitialRender) => {
+                        ViewStackProcessor.StartGetAccessRecordingFor(elmtId);
+                        ListItem.create(deepRenderFunction, true);
+                        if (!isInitialRender) {
+                            ListItem.pop();
+                        }
+                        ViewStackProcessor.StopGetAccessRecording();
+                    };
+                    const itemCreation2 = (elmtId, isInitialRender) => {
+                        ListItem.create(deepRenderFunction, true);
+                        ListItem.margin({ bottom: 8 });
+                    };
+                    const deepRenderFunction = (elmtId, isInitialRender) => {
+                        itemCreation(elmtId, isInitialRender);
+                        this.observeComponentCreation2((elmtId, isInitialRender) => {
+                            Column.create({ space: 4 });
+                            Column.padding(12);
+                            Column.backgroundColor('#F5F7FA');
+                            Column.borderRadius(8);
+                        }, Column);
+                        this.observeComponentCreation2((elmtId, isInitialRender) => {
+                            Text.create(`è®¾å¤‡åç§°: ${dev.name}`);
+                            Text.fontSize(16);
+                            Text.fontWeight(FontWeight.Medium);
+                        }, Text);
+                        Text.pop();
+                        this.observeComponentCreation2((elmtId, isInitialRender) => {
+                            Text.create(`å‚å•†ID: 0x${dev.vendorId.toString(16)}  ` +
+                                `äº§å“ID: 0x${dev.productId.toString(16)}`);
+                            Text.fontSize(14);
+                        }, Text);
+                        Text.pop();
+                        this.observeComponentCreation2((elmtId, isInitialRender) => {
+                            Text.create(`è®¾å¤‡ç±»åˆ«: ${dev.clazz}  åè®®: ${dev.protocol}`);
+                            Text.fontSize(14);
+                        }, Text);
+                        Text.pop();
+                        this.observeComponentCreation2((elmtId, isInitialRender) => {
+                            Text.create(`å­ç±»åˆ«: ${dev.subClass}  ç‰ˆæœ¬: ${dev.version}`);
+                            Text.fontSize(14);
+                        }, Text);
+                        Text.pop();
+                        this.observeComponentCreation2((elmtId, isInitialRender) => {
+                            Text.create(`æ€»çº¿å·: ${dev.busNum}  åœ°å€: ${dev.devAddress}`);
+                            Text.fontSize(14);
+                        }, Text);
+                        Text.pop();
+                        this.observeComponentCreation2((elmtId, isInitialRender) => {
+                            If.create();
+                            if (dev.isMock) {
+                                this.ifElseBranchUpdateFunction(0, () => {
+                                    this.observeComponentCreation2((elmtId, isInitialRender) => {
+                                        Text.create('ï¼ˆè™šæ‹Ÿè®¾å¤‡ï¼Œä»…ç”¨äºåŠŸèƒ½éªŒè¯ï¼‰');
+                                        Text.fontSize(12);
+                                        Text.fontColor('#999999');
+                                    }, Text);
+                                    Text.pop();
+                                });
+                            }
+                            else {
+                                this.ifElseBranchUpdateFunction(1, () => {
+                                });
+                            }
+                        }, If);
+                        If.pop();
+                        this.observeComponentCreation2((elmtId, isInitialRender) => {
+                            Button.createWithLabel('æµ‹è¯•æ­¤è®¾å¤‡');
+                            Button.margin({ top: 8 });
+                            Button.backgroundColor(dev.isMock ? '#00C689' : '#007DFF');
+                            Button.fontColor(Color.White);
+                            Button.onClick(() => {
+                                this.testDevice(dev);
+                            });
+                        }, Button);
+                        Button.pop();
+                        Column.pop();
+                        ListItem.pop();
+                    };
+                    this.observeComponentCreation2(itemCreation2, ListItem);
+                    ListItem.pop();
+                }
+            };
+            this.forEachUpdateFunction(elmtId, this.uiDevices, forEachItemGenFunction, (dev) => `${dev.isMock ? 'mock' : 'real'}-${dev.name}-${dev.vendorId}-${dev.productId}`, false, false);
+        }, ForEach);
+        ForEach.pop();
+        // è®¾å¤‡åˆ—è¡¨ï¼ˆæ³¨æ„ä½¿ç”¨ uiDevices æˆ–ä½ å½“å‰çš„æ•°ç»„ï¼‰
+        List.pop();
+        Column.pop();
+    }
+    rerender() {
+        this.updateDirtyElements();
+    }
+    static getEntryName() {
+        return "USBManagerPage";
+    }
+}
+registerNamedRoute(() => new USBManagerPage(undefined, {}), "", { bundleName: "com.example.usbdemo", moduleName: "entry", pagePath: "pages/Index", pageFullPath: "entry/src/main/ets/pages/Index", integratedHsp: "false", moduleType: "followWithHap" });
+//# sourceMappingURL=Index.js.mapÂ‘Ùj hvigor_ignore_C:_Program Files_Huawei_DevEco Studio_sdk_default_openharmony_ets_api_@ohos.usbManager.d.tsÙNC:\Users\Simon\DevEcoStudioProjects\USBdemo\entry\src\main\ets\pages\Index.etsÔrB›ªmoduleName±isLocalDependency¯isNodeEntryFile§pkgPath±belongProjectPath§pkgNameªpkgVersion±dependencyPkgInfo°belongModulePath§checker¬shouldEmitJs¥entryÃÂÙ1C:\Users\Simon\DevEcoStudioProjects\USBdemo\entryÙ+C:\Users\Simon\DevEcoStudioProjects\USBdemo¥entry¥1.0.0Ô  Ù1C:\Users\Simon\DevEcoStudioProjects\USBdemo\entryÔrCÜ ®¬getNodeCount²getIdentifierCount®getSymbolCount¬getTypeCountµgetInstantiationCountµgetRelationCacheSizes±isUndefinedSymbol±isArgumentsSymbol¯isUnknownSymbol¯getMergedSymbol®getDiagnostics´getGlobalDiagnostics´getRecursionIdentity¶getUnmatchedProperties¹getTypeOfSymbolAtLocation¯getTypeOfSymbolÙ(getSymbolsOfParameterPropertyDeclaration·getDeclaredTypeOfSymbol³getPropertiesOfType±getPropertyOfTypeÙ"getPrivateIdentifierPropertyOfType·getTypeOfPropertyOfType²getIndexInfoOfType³getIndexInfosOfTypeºgetIndexInfosOfIndexSymbol³getSignaturesOfType²getIndexTypeOfType¬getIndexType¬getBaseTypes¸getBaseTypeOfLiteralType®getWidenedType³getTypeFromTypeNode°getParameterTypeÙ$getParameterIdentifierNameAtPosition¸getPromisedTypeOfPromise®getAwaitedType¸getReturnTypeOfSignature®isNullableType¯getNullableType²getNonNullableType²getNonOptionalType°getTypeArguments®typeToTypeNodeÙ$indexInfoToIndexSignatureDeclaration¿signatureToSignatureDeclaration²symbolToEntityName²symbolToExpression¬symbolToNodeÙ!symbolToTypeParameterDeclarations¼symbolToParameterDeclarationºtypeParameterToDeclaration±getSymbolsInScope³getSymbolAtLocation·getIndexInfosAtLocationÙ!getShorthandAssignmentValueSymbolÙ#getExportSpecifierLocalTargetSymbol·getExportSymbolOfSymbol±getTypeAtLocationÙ tryGetTypeAtLocationWithoutCheckºgetTypeOfAssignmentPatternÙ*getPropertySymbolOfDestructuringAssignment±signatureToString¬typeToString®symbolToStringµtypePredicateToString®writeSignature©writeType«writeSymbol²writeTypePredicate¼getAugmentedPropertiesOfType®getRootSymbols²getSymbolOfExpando±getContextualTypeÙ(getContextualTypeForObjectLiteralElementÙ#getContextualTypeForArgumentAtIndexÙ getContextualTypeForJsxAttribute²isContextSensitiveÙ!getTypeOfPropertyOfContextualTypeµgetFullyQualifiedNameÙ#tryGetResolvedSignatureWithoutCheck´getResolvedSignatureÙ/getResolvedSignatureForStringLiteralCompletionsÙ$getResolvedSignatureForSignatureHelpµgetExpandedParameters¹hasEffectiveRestParameterºcontainsArgumentsReference°getConstantValueµisValidPropertyAccessÙ#isValidPropertyAccessForCompletions»getSignatureFromDeclarationºisImplementationOfOverload¹getImmediateAliasedSymbol°getAliasedSymbol¯getEmitResolver²getExportsOfModule¿getExportsAndPropertiesOfModuleÙ forEachExportAndPropertyOfModule¯getSymbolWalker±getAmbientModules¹getJsxIntrinsicTagNamesAt³isOptionalParameter»tryGetMemberInModuleExportsÙ(tryGetMemberInModuleExportsAndProperties´tryFindAmbientModuleÙ(tryFindAmbientModuleWithoutAugmentations¯getApparentType¬getUnionType²isTypeAssignableTo³createAnonymousType¯createSignature¬createSymbol¯createIndexInfoªgetAnyType­getStringType­getNumberType±createPromiseType¯createArrayType¹getElementTypeOfArrayType®getBooleanType¬getFalseType«getTrueType«getVoidType°getUndefinedType«getNullType¯getESSymbolType¬getNeverType¯getOptionalType®getPromiseType²getPromiseLikeType´getAsyncIterableType²isSymbolAccessible«isArrayType«isTupleType¯isArrayLikeTypeÙ#isTypeInvalidDueToUnionDiscriminantºgetExactOptionalProperties¿getAllPossiblePropertiesOfTypesÙ(getSuggestedSymbolForNonexistentPropertyÙ#getSuggestionForNonexistentPropertyÙ,getSuggestedSymbolForNonexistentJSXAttributeÙ&getSuggestedSymbolForNonexistentSymbolÙ!getSuggestionForNonexistentSymbolÙ&getSuggestedSymbolForNonexistentModuleÙ!getSuggestionForNonexistentExportÙ+getSuggestedSymbolForNonexistentClassMember·getBaseConstraintOfType»getDefaultFromTypeParameter«resolveName¯getJsxNamespaceµgetJsxFragmentFactory¸getAccessibleSymbolChain»getTypePredicateOfSignature¹resolveExternalModuleName»resolveExternalModuleSymbol°tryGetThisTypeAt¹getTypeArgumentConstraint¸getSuggestionDiagnostics¸runWithCancellationTokenÙ3getLocalTypeParametersOfClassOrInterfaceOrTypeAlias´isDeclarationVisible´isPropertyAccessible»getTypeOnlyAliasDeclaration¿getMemberOverrideModifierStatusÙ!isTypeParameterPossiblyReferenced²getConstEnumRelate´clearConstEnumRelateµdeleteConstEnumRelateÙ$getTypeArgumentsForResolvedSignatureµgetCheckedSourceFilesÙ"collectHaveTsNoCheckFilesForLinter·clearQualifiedNameCache®isStaticRecord²isStaticSourceFile³createIntrinsicTypeÔ  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  Ô  ÃÃÚ0A// USBManagerPage.ets
+// ä½¿ç”¨å®˜æ–¹æ¨èçš„ usbManagerï¼ˆSystemCapability.USB.USBManagerï¼‰
+import { usbManager, BusinessError } from '@kit.BasicServicesKit';
+interface DeviceViewModel {
+  name: string;
+  vendorId: number;
+  productId: number;
+  clazz: string;
+  protocol: string;
+  subClass: string;
+  version: string;
+  busNum: string;
+  devAddress: string;
+  isMock: boolean; // true=è™šæ‹Ÿè®¾å¤‡/ç«¯å£ï¼Œfalse=çœŸå®è®¾å¤‡
+}
+
+@Entry
+@Component
+struct USBManagerPage {
+  // UI ä½¿ç”¨çš„è®¾å¤‡åˆ—è¡¨ï¼ˆçœŸå® + è™šæ‹Ÿï¼‰
+  @State uiDevices: Array<DeviceViewModel> = [];
+  // ç³»ç»ŸçœŸå®è®¾å¤‡åˆ—è¡¨ï¼Œä»…åœ¨æµ‹è¯•çœŸå®è®¾å¤‡æ—¶ä½¿ç”¨
+  private realDevices: Array<usbManager.USBDevice> = [];
+
+  @State logText: string = 'ç‚¹å‡»ä¸‹æ–¹æŒ‰é’®æ‰«æ USB è®¾å¤‡';
+
+  // æ˜¯å¦å¼€å¯è™šæ‹Ÿè®¾å¤‡æµ‹è¯•æ¨¡å¼
+  @State mockMode: boolean = true;
+
+  private scanTimer?: number;
+  private lastDeviceCount: number = 0;
+
+  // é¡µé¢å³å°†æ˜¾ç¤º
+  aboutToAppear() {
+    // é¦–æ¬¡æ‰«æ
+    this.refreshUsbDevices();
+    // å¯åŠ¨ 2 ç§’ä¸€æ¬¡çš„è½®è¯¢æ‰«æ
+    this.startPeriodicScan();
+  }
+
+  // é¡µé¢é”€æ¯ï¼Œæ¸…ç†å®šæ—¶å™¨
+  aboutToDisappear() {
+    if (this.scanTimer !== undefined) {
+      clearInterval(this.scanTimer);
+      this.scanTimer = undefined;
+    }
+  }
+
+  /**
+   * å¯åŠ¨å®šæ—¶æ‰«æï¼ˆæ¯ 2 ç§’åˆ·æ–°ä¸€æ¬¡ USB è®¾å¤‡åˆ—è¡¨ï¼‰
+   */
+  private startPeriodicScan() {
+    // é¿å…é‡å¤å¼€å¯å¤šä¸ªå®šæ—¶å™¨
+    if (this.scanTimer !== undefined) {
+      clearInterval(this.scanTimer);
+    }
+
+    this.scanTimer = setInterval(() => {
+      this.refreshUsbDevices();
+    }, 2000);
+  }
+
+  /**
+   * åˆ·æ–° USB è®¾å¤‡åˆ—è¡¨
+   * è°ƒç”¨å®˜æ–¹ APIï¼šusbManager.getDevices()
+   */
+  private refreshUsbDevices() {
+    try {
+      const devices = usbManager.getDevices() as Array<usbManager.USBDevice> | undefined;
+      this.realDevices = devices ? [...devices] : [];
+
+      const uiList: Array<DeviceViewModel> = [];
+
+      // å…ˆæŠŠçœŸå®è®¾å¤‡æ˜ å°„æˆ ViewModel
+      this.realDevices.forEach((dev: usbManager.USBDevice) => {
+        uiList.push({
+          name: dev.productName ?? dev.name ?? 'æœªçŸ¥è®¾å¤‡',
+          vendorId: dev.vendorId ?? 0,
+          productId: dev.productId ?? 0,
+          clazz: dev.clazz?.toString() ?? 'æœªçŸ¥',
+          protocol: dev.protocol?.toString() ?? 'æœªçŸ¥',
+          subClass: dev.subClass?.toString() ?? 'æœªçŸ¥',
+          version: dev.version ?? 'æœªçŸ¥',
+          busNum: (dev.busNum ?? 0).toString(),
+          devAddress: (dev.devAddress ?? 0).toString(),
+          isMock: false
+        });
+      });
+
+      // å¦‚æœå¼€å¯è™šæ‹Ÿæ¨¡å¼ï¼Œæˆ–è€…çœŸå®è®¾å¤‡ä¸ºç©ºï¼Œå°±è¿½åŠ è™šæ‹Ÿè®¾å¤‡
+      if (this.mockMode || uiList.length === 0) {
+        const mocks = this.buildMockDevices();
+        uiList.push(...mocks);
+      }
+
+      // æ›´æ–° UI åˆ—è¡¨
+      this.uiDevices = uiList;
+
+      // æ—¥å¿—åªé’ˆå¯¹çœŸå®è®¾å¤‡æ•°é‡ï¼ˆè™šæ‹Ÿçš„ä¸ç®—ï¼‰
+      const currentRealCount = this.realDevices.length;
+      if (this.lastDeviceCount === 0) {
+        this.logText = `æ‰«æå®Œæˆï¼Œå½“å‰æ£€æµ‹åˆ° ${currentRealCount} ä¸ªçœŸå® USB è®¾å¤‡ï¼ˆè™šæ‹Ÿè®¾å¤‡ä¸è®¡å…¥æ•°é‡ï¼‰`;
+      } else if (currentRealCount > this.lastDeviceCount) {
+        this.logText = `æ£€æµ‹åˆ°çœŸå® USB è®¾å¤‡æ’å…¥ï¼Œå½“å‰å…± ${currentRealCount} ä¸ªè®¾å¤‡`;
+      } else if (currentRealCount < this.lastDeviceCount) {
+        this.logText = `æ£€æµ‹åˆ°çœŸå® USB è®¾å¤‡æ‹”å‡ºï¼Œå½“å‰å…± ${currentRealCount} ä¸ªè®¾å¤‡`;
+      }
+      this.lastDeviceCount = currentRealCount;
+    } catch (err) {
+      const error = err as BusinessError;
+      this.logText = `è·å– USB è®¾å¤‡åˆ—è¡¨å¤±è´¥: ${error.message ?? JSON.stringify(error)}`;
+    }
+  }
+
+
+  /**
+   * æµ‹è¯•å•ä¸ª USB è®¾å¤‡
+   * æµç¨‹ï¼š
+   * 1. æ£€æŸ¥ / è¯·æ±‚è®¿é—®æƒé™ï¼ˆusbManager.hasRight / requestRightï¼‰
+   * 2. connectDevice è·å–ç®¡é“ï¼ˆpipeï¼‰
+   * 3. getRawDescriptor è¯»å–åŸå§‹æè¿°ç¬¦ï¼Œåšç®€å•æ ¡éªŒ
+   * 4. å…³é—­ pipe
+   */
+  private async testRealDevice(device: usbManager.USBDevice) {
+    let pipe: usbManager.USBDevicePipe | undefined = undefined;
+    const deviceName: string = device.name ?? '';
+
+    try {
+      if (!deviceName) {
+        this.logText = 'ç›®æ ‡è®¾å¤‡çš„ name ä¸ºç©ºï¼Œæ— æ³•ç”³è¯·æƒé™';
+        return;
+      }
+
+      let hasRight: boolean = false;
+      try {
+        hasRight = usbManager.hasRight(deviceName);
+      } catch (err) {
+        const error = err as BusinessError;
+        this.logText = `æ£€æŸ¥è®¾å¤‡[${deviceName}]æƒé™å¤±è´¥: ${error.message ?? JSON.stringify(error)}`;
+        return;
+      }
+
+      if (!hasRight) {
+        try {
+          hasRight = await usbManager.requestRight(deviceName);
+        } catch (err) {
+          const error = err as BusinessError;
+          this.logText = `ç”³è¯·è®¾å¤‡[${deviceName}]æƒé™å¤±è´¥: ${error.message ?? JSON.stringify(error)}`;
+          return;
+        }
+      }
+
+      if (!hasRight) {
+        this.logText = `ç”¨æˆ·æœªæˆäºˆè®¾å¤‡[${deviceName}]çš„è®¿é—®æƒé™`;
+        return;
+      }
+
+      this.logText = `å·²è·å¾—è®¾å¤‡[${deviceName}]è®¿é—®æƒé™ï¼Œå¼€å§‹æµ‹è¯•...`;
+
+      pipe = usbManager.connectDevice(device);
+      this.logText = `è®¾å¤‡[${deviceName}]å·²è¿æ¥ï¼Œbus=${pipe.busNum}, addr=${pipe.devAddress}ï¼Œå¼€å§‹è¯»å–æè¿°ç¬¦...`;
+
+      const rawDesc: Uint8Array = usbManager.getRawDescriptor(pipe);
+      if (!rawDesc || rawDesc.length === 0) {
+        this.logText = `è®¾å¤‡[${deviceName}]è¿”å›çš„æè¿°ç¬¦ä¸ºç©ºï¼Œå¯èƒ½ä¸æ”¯æŒæ ‡å‡†æè¿°ç¬¦è¯»å–`;
+        return;
+      }
+
+      const bLength = rawDesc[0];
+      const bDescriptorType = rawDesc[1];
+      const bcdUsb = (rawDesc[3] << 8) | rawDesc[2];
+
+      this.logText =
+        `è®¾å¤‡[${deviceName}]æµ‹è¯•æˆåŠŸï¼š` +
+          `åŸå§‹æè¿°ç¬¦é•¿åº¦ ${rawDesc.length} å­—èŠ‚ï¼›` +
+          `bLength=${bLength}ï¼ŒbDescriptorType=${bDescriptorType}ï¼ŒUSBç‰ˆæœ¬=0x${bcdUsb.toString(16)}`;
+    } catch (err) {
+      const error = err as Error;
+      this.logText = `æµ‹è¯•è®¾å¤‡[${deviceName}]å¤±è´¥: ${error.message ?? JSON.stringify(error)}`;
+    } finally {
+      if (pipe !== undefined) {
+        try {
+          usbManager.closePipe(pipe);
+        } catch (e) {
+          console.error(`å…³é—­è®¾å¤‡[${deviceName}]å¤±è´¥: ${JSON.stringify(e)}`);
+        }
+      }
+    }
+  }
+  private async testMockDevice(dev: DeviceViewModel) {
+    // æ¨¡æ‹Ÿæµ‹è¯•è€—æ—¶
+    await new Promise<void>(resolve => setTimeout(resolve, 500));
+
+    if (dev.name.indexOf('æ— æ³•è¯†åˆ«') >= 0) {
+      this.logText =
+        `è™šæ‹Ÿè®¾å¤‡[${dev.name}]ï¼šè®¾å¤‡æè¿°ç¬¦æ— æ³•è§£æã€‚\n` +
+          `å»ºè®®ï¼š\n` +
+          `1. æ£€æŸ¥è®¾å¤‡æ˜¯å¦ä¸ºæ ‡å‡† USB è®¾å¤‡ï¼›\n` +
+          `2. å°è¯•åœ¨å…¶ä»–ç«¯å£ / ç”µè„‘ä¸ŠéªŒè¯è®¾å¤‡æ˜¯å¦æ­£å¸¸ï¼›\n` +
+          `3. å¦‚æœæ˜¯è‡ªå®šä¹‰è®¾å¤‡ï¼Œç¡®è®¤å›ºä»¶æ˜¯å¦æ­£ç¡®å®ç° USB æè¿°ç¬¦ã€‚`;
+    } else if (dev.name.indexOf('è¯»å†™å¼‚å¸¸') >= 0) {
+      this.logText =
+        `è™šæ‹Ÿè®¾å¤‡[${dev.name}]ï¼šæ§åˆ¶ä¼ è¾“/æ‰¹é‡ä¼ è¾“å‡ºç°è¶…æ—¶æˆ–é”™è¯¯ã€‚\n` +
+          `å»ºè®®ï¼š\n` +
+          `1. æ£€æŸ¥ USB çº¿ç¼†ã€ç”µæºä¾›ç»™æ˜¯å¦ç¨³å®šï¼›\n` +
+          `2. é™ä½ä¼ è¾“é€Ÿåº¦æˆ–ç¼©å°å•æ¬¡ä¼ è¾“æ•°æ®é‡ï¼›\n` +
+          `3. åœ¨é©±åŠ¨ç«¯å¢åŠ è¶…æ—¶é‡è¯•å’Œé”™è¯¯ç ä¸ŠæŠ¥ã€‚`;
+    } else {
+      this.logText =
+        `è™šæ‹Ÿè®¾å¤‡[${dev.name}]ï¼šæµ‹è¯•é€šè¿‡ï¼Œæ¨¡æ‹Ÿè¯»å†™é€Ÿç‡ 30 MB/sï¼Œé”™è¯¯ç‡ 0%ã€‚\n` +
+          `å¯è®¤ä¸ºå½“å‰ USB ç®¡ç†å·¥å…·åœ¨æ­£å¸¸è®¾å¤‡åœºæ™¯ä¸‹å·¥ä½œæ­£å¸¸ã€‚`;
+    }
+  }
+  private async testDevice(item: DeviceViewModel) {
+    if (item.isMock) {
+      await this.testMockDevice(item);
+      return;
+    }
+
+    // æ ¹æ® vendorId/productId/name æ‰¾åˆ°å¯¹åº”çœŸå® USBDevice
+    const origin = this.realDevices.find(d =>
+    (d.vendorId ?? 0) === item.vendorId &&
+      (d.productId ?? 0) === item.productId &&
+      (d.productName ?? d.name ?? '') === item.name
+    );
+
+    if (!origin) {
+      this.logText = `æœªåœ¨çœŸå®è®¾å¤‡åˆ—è¡¨ä¸­æ‰¾åˆ° [${item.name}]ï¼Œæ— æ³•æ‰§è¡ŒçœŸå®æµ‹è¯•`;
+      return;
+    }
+
+    await this.testRealDevice(origin);
+  }
+  /**
+   * æ„é€ è™šæ‹Ÿ USB ç«¯å£/è®¾å¤‡åˆ—è¡¨ï¼Œç”¨äºåœ¨æ— çœŸå®ç¡¬ä»¶æ—¶æµ‹è¯• UI å’Œé€»è¾‘
+   */
+  private buildMockDevices(): Array<DeviceViewModel> {
+    return [
+      {
+        name: 'ç«¯å£1: è™šæ‹ŸUç›˜',
+        vendorId: 0x1234,
+        productId: 0x0001,
+        clazz: 'MassStorage(0x08)',
+        protocol: 'Bulk-Only',
+        subClass: 'SCSI(0x06)',
+        version: '2.0',
+        busNum: '1',
+        devAddress: '2',
+        isMock: true
+      },
+      {
+        name: 'ç«¯å£2: è™šæ‹Ÿé”®ç›˜',
+        vendorId: 0x1234,
+        productId: 0x0002,
+        clazz: 'HID(0x03)',
+        protocol: 'Keyboard',
+        subClass: 'Boot(0x01)',
+        version: '1.1',
+        busNum: '1',
+        devAddress: '3',
+        isMock: true
+      },
+      {
+        name: 'ç«¯å£3: æ— æ³•è¯†åˆ«çš„è®¾å¤‡',
+        vendorId: 0xFFFF,
+        productId: 0x0003,
+        clazz: 'Unknown(0xFF)',
+        protocol: 'VendorSpecific',
+        subClass: 'Unknown',
+        version: '2.0',
+        busNum: '2',
+        devAddress: '1',
+        isMock: true
+      },
+      {
+        name: 'ç«¯å£4: è¯»å†™å¼‚å¸¸è®¾å¤‡',
+        vendorId: 0x1234,
+        productId: 0x0004,
+        clazz: 'MassStorage(0x08)',
+        protocol: 'Bulk-Only',
+        subClass: 'SCSI(0x06)',
+        version: '2.0',
+        busNum: '2',
+        devAddress: '2',
+        isMock: true
+      }
+    ];
+  }
+
+  build() {
+    Column({ space: 12 }) {
+      // æ ‡é¢˜
+      Text('USB è®¾å¤‡ç®¡ç†å·¥å…·')
+        .fontSize(24)
+        .fontWeight(FontWeight.Bold)
+        .margin({ top: 16 });
+
+      // æ‰‹åŠ¨æ‰«ææŒ‰é’®
+      Button('æ‰‹åŠ¨æ‰«æ USB è®¾å¤‡')
+        .backgroundColor('#007DFF')
+        .fontColor(Color.White)
+        .onClick(() => {
+          this.refreshUsbDevices();
+        });
+
+      // è™šæ‹Ÿè®¾å¤‡æµ‹è¯•å¼€å…³æŒ‰é’®ï¼ˆæ³¨æ„ï¼šåœ¨ Column é‡Œé¢ï¼‰
+      Button(this.mockMode ? 'å…³é—­è™šæ‹Ÿè®¾å¤‡æµ‹è¯•' : 'å¼€å¯è™šæ‹Ÿè®¾å¤‡æµ‹è¯•')
+        .margin({ top: 8 })
+        .backgroundColor('#999999')
+        .fontColor(Color.White)
+        .onClick(() => {
+          this.mockMode = !this.mockMode;
+          this.refreshUsbDevices();
+        });
+
+      // æ—¥å¿—æ˜¾ç¤º
+      Text(this.logText)
+        .fontSize(14)
+        .fontColor(Color.Grey)
+        .maxLines(4)
+        .textOverflow({ overflow: TextOverflow.Ellipsis })
+        .margin({ top: 8, bottom: 8 });
+
+      // è®¾å¤‡åˆ—è¡¨ï¼ˆæ³¨æ„ä½¿ç”¨ uiDevices æˆ–ä½ å½“å‰çš„æ•°ç»„ï¼‰
+      List() {
+        ForEach(
+          this.uiDevices,           // å¦‚æœä½ è¿˜åœ¨ç”¨ usbDevicesï¼Œè¿™é‡Œæ”¹å› usbDevices
+          (dev: DeviceViewModel) => {
+            ListItem() {
+              Column({ space: 4 }) {
+                Text(`è®¾å¤‡åç§°: ${dev.name}`)
+                  .fontSize(16)
+                  .fontWeight(FontWeight.Medium);
+
+                Text(
+                  `å‚å•†ID: 0x${dev.vendorId.toString(16)}  ` +
+                    `äº§å“ID: 0x${dev.productId.toString(16)}`
+                )
+                  .fontSize(14);
+
+                Text(`è®¾å¤‡ç±»åˆ«: ${dev.clazz}  åè®®: ${dev.protocol}`)
+                  .fontSize(14);
+
+                Text(`å­ç±»åˆ«: ${dev.subClass}  ç‰ˆæœ¬: ${dev.version}`)
+                  .fontSize(14);
+
+                Text(`æ€»çº¿å·: ${dev.busNum}  åœ°å€: ${dev.devAddress}`)
+                  .fontSize(14);
+
+                if (dev.isMock) {
+                  Text('ï¼ˆè™šæ‹Ÿè®¾å¤‡ï¼Œä»…ç”¨äºåŠŸèƒ½éªŒè¯ï¼‰')
+                    .fontSize(12)
+                    .fontColor('#999999');
+                }
+
+                Button('æµ‹è¯•æ­¤è®¾å¤‡')
+                  .margin({ top: 8 })
+                  .backgroundColor(dev.isMock ? '#00C689' : '#007DFF')
+                  .fontColor(Color.White)
+                  .onClick(() => {
+                    this.testDevice(dev);
+                  });
+              }
+              .padding(12)
+              .backgroundColor('#F5F7FA')
+              .borderRadius(8);
+            }
+            .margin({ bottom: 8 });
+          },
+          (dev: DeviceViewModel) =>
+          `${dev.isMock ? 'mock' : 'real'}-${dev.name}-${dev.vendorId}-${dev.productId}`
+        );
+      }
+      .height('60%')
+      .divider({ strokeWidth: 1, color: '#EEEEEE' });
+    }
+    .padding(16)
+    .width('100%')
+    .height('100%')
+    .backgroundColor('#FFFFFF');
+  }
+
+}ÀÔrD‘°@ohos.usbManagerÔrE—ªassertions¨external¢id¤meta±moduleSideEffectsªresolvedByµsyntheticNamedExportsAÃÙj hvigor_ignore_C:_Program Files_Huawei_DevEco Studio_sdk_default_openharmony_ets_api_@ohos.usbManager.d.tsÔrF‘¯hostModulesInfo‘ÔrG’²hostDependencyName®hostModuleName°@ohos.usbManager¥entryÃªoh-resolveÂ“ÔrH–§version¤fileªsourceRoot§sources¥names¨mappings¨Index.js ‘©Index.etsÜâ’”    ”  ’”   ”6 6–”   ” 	” ” *”) ÌA”* ÌB’” ” ‘”  ’”8 -”: /’” 5” 7’”6 ”ÌG ,’”7 ”; !’” $”  %‘” ’” 	” ’” 	” ’” 	” ’” 	” ’” 	” ’” 	” ’”  ”  ’” !” !’” "” "–” #” #” #	” #”  #”! #’” $” $–” %” %” %	” %”  %”! %’” &” &’” (” (’” )” )˜” *” *” *” *” *” *”( *$”* *&˜” +” +” +” +” +”( +"”) +#”* +$—” ,” ,
+” ,” ,” ,”& , ”' ,!‘”	 -’” .” .‘” 0‘” 2’” 3
+” 3’” 4” 4˜” 5” 5” 5” 5” 5” 5”( 5$”* 5&˜” 6” 6” 6” 6” 6”( 6"”) 6#”* 6$‘”	 7™” 9” 9” 9	” 9” 9”$ 9 ”% 9!”( 9$”* 9&–” :” :
+” :”" :”$ :”% :–” ;”	 ;” ;” ;” ;” ;’” <” <‘” >‘” ÌA’” ÌB
+” ÌB’” ÌC” ÌC™” ÌD” ÌD” ÌD” ÌD”& ÌD ”' ÌD!”1 ÌD+”3 ÌDÌX”4 ÌDÌYÜ ” ÌE” ÌE
+” ÌE” ÌE” ÌE”& ÌE ”' ÌE!”( ÌE"”) ÌE#”* ÌE$”- ÌE'”4 ÌE.”5 ÌE/”6 ÌE0”7 ÌE1”8 ÌE2”: ÌE4”; ÌE5–” ÌG” ÌG” ÌG” ÌG-” ÌG/” ÌG0’” ÌI”" ÌI›” ÌJ” ÌJ
+” ÌJ” ÌJ” ÌJ”$ ÌJ”% ÌJ”& ÌJ ”) ÌJ9”+ ÌJ;”- ÌJ=•” ÌK” ÌK” ÌK” ÌK” ÌKœ” ÌL
+” ÌL” ÌL” ÌL” ÌL”) ÌL”- ÌL#”0 ÌL&”1 ÌL'”5 ÌL+”9 ÌL/”? ÌL5˜” ÌM
+” ÌM” ÌM”! ÌM”" ÌM”* ÌM ”. ÌM$”/ ÌM%˜” ÌN
+” ÌN” ÌN”" ÌN”# ÌN”, ÌN"”0 ÌN&”1 ÌN'›” ÌO
+” ÌO” ÌO” ÌO” ÌO”$ ÌO”& ÌO”. ÌO$”0 ÌO&”4 ÌO*”8 ÌO.›” ÌP
+” ÌP” ÌP”! ÌP”" ÌP”* ÌP ”, ÌP"”4 ÌP*”6 ÌP,”: ÌP0”> ÌP4›” ÌQ
+” ÌQ” ÌQ”! ÌQ”" ÌQ”* ÌQ ”, ÌQ"”4 ÌQ*”6 ÌQ,”: ÌQ0”> ÌQ4˜” ÌR
+” ÌR” ÌR”  ÌR”! ÌR”( ÌR”, ÌR"”0 ÌR&” ÌS
+” ÌS” ÌS” ÌS”  ÌS”! ÌS”' ÌS”+ ÌS!”, ÌS"”- ÌS#”. ÌS$”6 ÌS,”8 ÌS.” ÌT
+” ÌT”  ÌT”! ÌT”$ ÌT”% ÌT”/ ÌT%”3 ÌT)”4 ÌT*”5 ÌT+”6 ÌT,”> ÌT4”Ì@ ÌT6”” ÌU
+” ÌU” ÌU”! ÌU“” ÌV	” ÌV
+” ÌV”” ÌW” ÌW” ÌW” ÌW	’” ÌY”( ÌY"œ” ÌZ” ÌZ
+” ÌZ” ÌZ” ÌZ”! ÌZ”' ÌZ!”( ÌZ"”. ÌZ(”3 ÌZ-”4 ÌZ.”6 ÌZ0™” Ì[” Ì[” Ì[” Ì[”" Ì[”# Ì[”3 Ì[+”5 Ì[-”6 Ì[.™” Ì\” Ì\” Ì\” Ì\” Ì\” Ì\”$ Ì\”% Ì\”& Ì\‘” Ì]’” Ì_” Ì_—” Ì`” Ì`
+” Ì`” Ì`” Ì`”# Ì`”$ Ì`’” Ìb”! Ìbš” Ìc” Ìc”" Ìc”% Ìc”) Ìc#”* Ìc$”5 Ìc/”6 Ìc0”< Ìc6”= Ìc7˜” Ìd” Ìd
+” Ìd” Ìd”$ Ìd”) Ìd#”* Ìd$”, Ìd&™” Ìe” Ìe” Ìe” Ìe” Ìe”- Ìe%”= Ìe5”ÌU ÌeÌM”ÌV ÌeÌN‘” Ìf˜” Ìf” Ìf”% Ìf!”( Ìf$”, Ìf(”- Ìf)”< Ìf8”> Ìf:™” Ìg” Ìg” Ìg” Ìg” Ìg”5 Ìg-”ÌE Ìg=”ÌK ÌgÌC”ÌL ÌgÌD‘” Ìh˜” Ìh” Ìh”% Ìh!”( Ìh$”, Ìh(”- Ìh)”< Ìh8”> Ìh:™” Ìi” Ìi” Ìi” Ìi” Ìi”5 Ìi-”ÌE Ìi=”ÌK ÌiÌC”ÌL ÌiÌD‘” Ìj—” Ìk” Ìk
+” Ìk”  Ìk”# Ìk”3 Ìk-”4 Ìk.‘”	 Ìl”” Ìl” Ìl” Ìl” Ìl–” Ìm” Ìm” Ìm” Ìm” Ìm(” Ìm)Ü ” Ìn” Ìn
+” Ìn” Ìn” Ìn”- Ìn'”2 Ìn,”3 Ìn-”: Ìn4”> Ìn8”ÌB Ìn<”ÌC Ìn=”ÌL ÌnÌF”ÌM ÌnÌG”ÌR ÌnÌL”ÌS ÌnÌM”ÌU ÌnÌO”ÌV ÌnÌP‘”	 Ìo’” Ìp” Ìp‘” Ìs‘” Ìz–” Ì{
+”	 Ì{”
+ Ì{” Ì{” Ì{” Ì{;–” Ì|” Ì|” Ì|” Ì|5” Ì|>” Ì|?š” Ì}” Ì}
+” Ì}” Ì}”! Ì}%”" Ì}&”& Ì}*”* Ì}.”, Ì}0”- Ì}1’” Ì” Ì•” Ì€” Ì€
+” Ì€” Ì€” Ì€—” Ì” Ì” Ì” Ì” Ì”5 Ì-”6 Ì.’” Ì‚” Ì‚‘” Ìƒ–” Ì…” Ì…
+” Ì…” Ì…”  Ì…#”! Ì…$’” Ì†” Ì†
+š” Ì‡” Ì‡” Ì‡”% Ì‡”& Ì‡”. Ì‡&”/ Ì‡'”9 Ì‡1”: Ì‡2”; Ì‡3‘” Ìˆ”” Ìˆ” Ìˆ” Ìˆ” Ìˆ–” Ì‰” Ì‰” Ì‰” Ì‰”! Ì‰*”" Ì‰+Ü ” ÌŠ” ÌŠ” ÌŠ” ÌŠ” ÌŠ”' ÌŠ”1 ÌŠ)”; ÌŠ3”Ì@ ÌŠ8”ÌA ÌŠ9”ÌH ÌŠÌ@”ÌL ÌŠÌD”ÌP ÌŠÌH”ÌQ ÌŠÌI”ÌZ ÌŠÌR”Ì[ ÌŠÌS”Ì` ÌŠÌX”Ìa ÌŠÌY”Ìc ÌŠÌ[”Ìd ÌŠÌ\’” Ì‹” Ì‹‘” ÌŒ•” Ì” Ì
+” Ì” Ì” Ì’” Ì” Ì›” Ì
+” Ì” Ì”% Ì”/ Ì%”0 Ì&”< Ì2”= Ì3”ÌG Ì=”ÌH Ì>”ÌI Ì?‘” Ì‘	”” Ì‘
+” Ì‘” Ì‘” Ì‘–” Ì’
+” Ì’” Ì’”" Ì’”% Ì’,”& Ì’-Ü ” Ì“
+” Ì“” Ì“”  Ì“”# Ì“”+ Ì“!”5 Ì“+”? Ì“5”ÌD Ì“:”ÌE Ì“;”ÌL Ì“ÌB”ÌP Ì“ÌF”ÌT Ì“ÌJ”ÌU Ì“ÌK”Ì^ Ì“ÌT”Ì_ Ì“ÌU”Ìd Ì“ÌZ”Ìe Ì“Ì[”Ìg Ì“Ì]”Ìh Ì“Ì^’” Ì”
+” Ì”‘” Ì•	‘” Ì–•” Ì˜” Ì˜
+” Ì˜” Ì˜” Ì˜™” Ì™” Ì™” Ì™” Ì™” Ì™”* Ì™"”4 Ì™,”< Ì™4”= Ì™5’” Ìš” Ìš‘” Ì›™” Ì” Ì
+” Ì” Ì” Ì”$ Ì”. Ì(”= Ì7”> Ì8š” ÌŸ” ÌŸ
+” ÌŸ” ÌŸ” ÌŸ”+ ÌŸ%”, ÌŸ&”2 ÌŸ,”3 ÌŸ-”4 ÌŸ.Ü ” Ì ” Ì 
+” Ì ” Ì ” Ì ”! Ì ”+ Ì %”7 Ì 1”; Ì 5”< Ì 6”ÌB Ì <”ÌL Ì ÌF”ÌP Ì ÌJ”ÌQ Ì ÌK”Ì[ Ì ÌU”Ìh Ì Ìb”Ìi Ì Ìc›” Ì¢” Ì¢” Ì¢” Ì¢"”& Ì¢,”' Ì¢-”7 Ì¢=”8 Ì¢>”< Ì¢ÌB”= Ì¢ÌC”> Ì¢ÌD›” Ì£” Ì£
+” Ì£” Ì£” Ì£”# Ì£”$ Ì£”* Ì£$”/ Ì£)”0 Ì£*”2 Ì£,™” Ì¤” Ì¤” Ì¤” Ì¤” Ì¤”% Ì¤”/ Ì¤'”ÌG Ì¤?”ÌH Ì¤Ì@’” Ì¥” Ì¥‘” Ì¦™” Ì¨” Ì¨” Ì¨” Ì¨”# Ì¨”$ Ì¨”% Ì¨”& Ì¨ ”' Ì¨!™” Ì©” Ì©”! Ì©”$ Ì©”+ Ì©%”, Ì©&”- Ì©'”. Ì©(”/ Ì©)Ü ” Ìª” Ìª” Ìª” Ìª” Ìª”# Ìª”$ Ìª”% Ìª”& Ìª ”* Ìª$”+ Ìª%”, Ìª&”/ Ìª)”6 Ìª0”7 Ìª1”8 Ìª2”9 Ìª3”: Ìª4”” Ì¬” Ì¬
+” Ì¬” Ì¬”” Ì­” Ì­”  Ì­”( Ì­ –” Ì®
+” Ì®”& Ì®”' Ì®”- Ì®#”3 Ì®)” Ì¯
+” Ì¯”& Ì¯”: Ì¯0”ÌI Ì¯?”ÌU Ì¯ÌK”Ì[ Ì¯ÌQ”Ì\ Ì¯ÌR”Ìd Ì¯ÌZ”Ìe Ì¯Ì[”Ìg Ì¯Ì]”Ìh Ì¯Ì^”Ìj Ì¯Ì`”Ìk Ì¯Ìa‘”	 Ì°”” Ì°” Ì°” Ì°” Ì°–” Ì±” Ì±” Ì±” Ì±” Ì± ” Ì±!Ü ” Ì²” Ì²
+” Ì²” Ì²” Ì²”# Ì²”- Ì²'”5 Ì²/”: Ì²4”; Ì²5”ÌB Ì²<”ÌF Ì²Ì@”ÌJ Ì²ÌD”ÌK Ì²ÌE”ÌT Ì²ÌN”ÌU Ì²ÌO”ÌZ Ì²ÌT”Ì[ Ì²ÌU”Ì] Ì²ÌW”Ì^ Ì²ÌX‘”	 Ì³‘” Ì³–” Ì´” Ì´
+” Ì´” Ì´”" Ì´”$ Ì´’” Ìµ” Ìµ˜” Ì¶
+” Ì¶” Ì¶”( Ì¶”) Ì¶”- Ì¶#”. Ì¶$”/ Ì¶%‘” Ì·	”” Ì·
+” Ì·” Ì·” Ì·Ü ” Ì¸
+” Ì¸” Ì¸”! Ì¸”" Ì¸”* Ì¸ ”4 Ì¸*”< Ì¸2”Ì@ Ì¸6”ÌA Ì¸7”ÌJ Ì¸Ì@”ÌK Ì¸ÌA”ÌL Ì¸ÌB”ÌM Ì¸ÌC”ÌO Ì¸ÌE”ÌP Ì¸ÌF”ÌQ Ì¸ÌG‘” Ì¹	‘” Ìº‘”	 Ì»’” Ì¼” Ì¼–” Ì½
+”	 Ì½”
+ Ì½” Ì½” Ì½” Ì½3’” Ì¾” Ì¾Ü ” Ì¿” Ì¿
+” Ì¿” Ì¿” Ì¿”! Ì¿#”" Ì¿$”$ Ì¿&”% Ì¿'”/ Ì¿1”0 Ì¿2”7 Ì¿9”9 Ì¿;”< Ì¿>”= Ì¿?”> Ì¿Ì@”? Ì¿ÌA” ÌÁ” ÌÁ” ÌÁ” ÌÁ” ÌÁ” ÌÁ” ÌÁ” ÌÁ”# ÌÁ”$ ÌÁ ”( ÌÁ$”) ÌÁ%”+ ÌÁ'”” ÌÂ” ÌÂ
+” ÌÂ” ÌÂ–” ÌÃ” ÌÃ” ÌÃ” ÌÃ”  ÌÃ”0 ÌÃ(’” ÌÄ
+” ÌÄ’” ÌÅ
+”, ÌÅ"’” ÌÆ
+”1 ÌÆ'“” ÌÇ
+”5 ÌÇ+”6 ÌÇ,‘”	 ÌÈ” ÌÈ” ÌÈ” ÌÈ” ÌÈ” ÌÈ” ÌÈ”! ÌÈ”" ÌÈ ”( ÌÈ&”) ÌÈ'”- ÌÈ+”. ÌÈ,”0 ÌÈ.”” ÌÉ” ÌÉ
+” ÌÉ” ÌÉ–” ÌÊ” ÌÊ” ÌÊ” ÌÊ”  ÌÊ”7 ÌÊ/’” ÌË
+” ÌË’” ÌÌ
+”. ÌÌ$’” ÌÍ
+”, ÌÍ"“” ÌÎ
+”* ÌÎ ”+ ÌÎ!‘”	 ÌÏ‘” ÌÏ”” ÌĞ” ÌĞ
+” ÌĞ” ÌĞ–” ÌÑ” ÌÑ” ÌÑ” ÌÑ”  ÌÑ”ÌA ÌÑ9“” ÌÒ
+”1 ÌÒ'”2 ÌÒ(‘”	 ÌÓ’” ÌÔ” ÌÔ–” ÌÕ
+”	 ÌÕ”
+ ÌÕ” ÌÕ” ÌÕ” ÌÕ0–” ÌÖ” ÌÖ” ÌÖ” ÌÖ” ÌÖ” ÌÖ™” Ì×” Ì×” Ì×” Ì×”% Ì×”& Ì× ”* Ì×$”+ Ì×%”, Ì×&’” ÌØ” ÌØ‘”	 ÌÙ’” ÌÛ”6 ÌÛ2Ü ” ÌÜ” ÌÜ
+” ÌÜ” ÌÜ” ÌÜ” ÌÜ”' ÌÜ#”( ÌÜ$”, ÌÜ(”- ÌÜ)”. ÌÜ*”/ ÌÜ+”1 ÌÜ-”2 Ìİ”3 Ìİ”4 Ìİ”5 Ìİ”= Ìİ”ÌA Ìİ”ÌB Ìİ”ÌC Ìİ”ÌH Ìİ”ÌL Ìİ”ÌM Ìİ”ÌU Ìİ'œ” ÌŞ” ÌŞ” ÌŞ” ÌŞ	” ÌŞ” ÌŞ” ÌŞ” ÌŞ”# ÌŞ”' ÌŞ!”( ÌŞ"”1 ÌŞ+Ü ” Ìß” Ìß” Ìß” Ìß	” Ìß” Ìß” Ìß”  Ìß”$ Ìß”( Ìß"”* Ìß$”+ Ìß%”0 Ìß*”4 Ìß.”5 Ìß/”9 Ìß3”: Ìà”; Ìà•” Ìâ” Ìâ” Ìâ	” Ìâ” Ìâ›” Ìã” Ìã
+” Ìã” Ìã” Ìã”+ Ìã%”/ Ìã)”0 Ìã*”4 Ìã.”Ì@ Ìã:”ÌA Ìã;’” Ìä” Ìä‘”	 Ìå™” Ìç” Ìç
+” Ìç” Ìç”! Ìç”" Ìç”( Ìç$”) Ìç%”* Ìç&’” Ìè” Ìè‘” Ìé‘” Ìë’” Ìì
+” Ìì’” Ìí” Ìí‘” Ìî”” Ìï” Ìï” Ìï”! Ìï”” Ìğ” Ìğ” Ìğ”  Ìğ”” Ìñ” Ìñ” Ìñ”! Ìñ”” Ìò” Ìò” Ìò”* Ìò"”” Ìó” Ìó” Ìó”% Ìó”” Ìô” Ìô” Ìô”& Ìô”” Ìõ” Ìõ” Ìõ” Ìõ”” Ìö” Ìö” Ìö” Ìö”” Ì÷” Ì÷” Ì÷” Ì÷”” Ìø” Ìø” Ìø” Ìø‘” Ìù‘” Ìú”” Ìû” Ìû” Ìû”! Ìû”” Ìü” Ìü” Ìü”  Ìü”” Ìı” Ìı” Ìı”! Ìı”” Ìş” Ìş” Ìş”" Ìş”” Ìÿ” Ìÿ” Ìÿ”$ Ìÿ”” Í ” Í ” Í ”& Í ”” Í” Í” Í” Í”” Í” Í” Í” Í”” Í” Í” Í” Í”” Í” Í” Í” Í‘” Í‘” Í”” Í” Í” Í”$ Í”” Í” Í” Í”  Í”” Í	” Í	” Í	”! Í	”” Í
+” Í
+” Í
+”& Í
+”” Í” Í” Í”* Í"”” Í” Í” Í”# Í”” Í” Í” Í” Í”” Í” Í” Í” Í”” Í” Í” Í” Í”” Í” Í” Í” Í‘” Í‘” Í”” Í” Í” Í”# Í”” Í” Í” Í”  Í”” Í” Í” Í”! Í”” Í” Í” Í”* Í"”” Í” Í” Í”% Í”” Í” Í” Í”& Í”” Í” Í” Í” Í”” Í” Í” Í” Í”” Í” Í” Í” Í”” Í” Í” Í” Í‘” Í’”	 Í”
+ Í’” Í” Í‘” Í!˜” Í"” Í"
+” Í"” Í"”! Í"”# Í"”% Í"”' Í"–” Í"” Í"
+” Íx” Íx” Íx” Íx–” Í"” Í"
+” Íy” Íy
+” Íy” Íy–” Í"” Í"
+” Íz” Íz” Íz”  Íz–” Í"” Í"
+” Í{”" Í{”# Í{”, Í{’” Í#” Í#”” Í$” Í$
+” Í$”$ Í$’” Í#” Í#–” Í$” Í$
+” Í%	” Í%” Í%” Í%’” Í#” Í#˜” Í$” Í$
+” Í&	” Í&” Í&”& Í&”' Í&”+ Í&#’” Í#” Í#š” Í$” Í$
+” Í'	” Í'” Í'” Í'” Í'” Í'”! Í'”# Í'’” Í#” Í#’” Í$” Í$
+’” Í)” Í)”” Í*” Í*”# Í*”0 Í*’” Í)” Í)–” Í*” Í*” Í+	”" Í+”# Í+”, Í+"’” Í)” Í)˜” Í*” Í*” Í,	” Í,” Í,”" Í,”# Í,”( Í,’” Í)” Í)—” Í*” Í*” Í-	” Í-” Í-” Í-”  Í-–” Í.
+” Í.” Í.”& Í. ”( Í."”) Í.#’” Í/” Í/	’” Í)” Í)’” Í*” Í*’” Í1”) Í1#” Í2” Í2”# Í2”' Í2”( Í2”0 Í2”1 Í2”2 Í2”3 Í2”= Í2'”> Í2(”? Í2)”Ì@ Í2*”ÌJ Í24’” Í1”) Í1#š” Í2” Í2” Í3	” Í3” Í3” Í3” Í3”! Í3”" Í3”$ Í3’” Í1”) Í1#–” Í2” Í2” Í4	”" Í4”# Í4”, Í4"’” Í1”) Í1#˜” Í2” Í2” Í5	” Í5” Í5”" Í5”# Í5”( Í5’” Í1”) Í1#—” Í2” Í2” Í6	” Í6” Í6” Í6”  Í6š” Í7
+” Í7” Í7” Í7”  Í7”! Í7”% Í7”& Í7 ”. Í7(”/ Í7)–” Í8
+” Í8” Í8”& Í8 ”( Í8"”) Í8#’” Í9” Í9	’” Í1”% Í1#’” Í2” Í2’” Í;” Í;–” Í<” Í<
+” Í<” Í<” Í<”$ Í<’” Í;” Í;–” Í<” Í<
+” Í=	” Í=” Í=” Í=’” Í;” Í;˜” Í<” Í<
+” Í>	” Í>” Í>”  Í>”! Í>”% Í>’” Í;” Í;–” Í<” Í<
+” Í?	” Í?” Í?” Í?’” Í;” Í;œ” Í<” Í<
+” Í@	” Í@” Í@”  Í@”( Í@ ”* Í@"”6 Í@.”7 Í@/”? Í@7”ÌA Í@9’” Í;” Í;” Í<” Í<
+” ÍA	” ÍA” ÍA” ÍA” ÍA” ÍA”  ÍA”" ÍA”( ÍA ”* ÍA"”+ ÍA#”- ÍA%’” Í;” Í;’” Í<” Í<
+’” ÍC”+ ÍC%’” ÍD” ÍD
+’” ÍC”+ ÍC%–” ÍD” ÍD
+” Íu” Íu” Íu” Íu’” ÍC”+ ÍC%” ÍD” ÍD
+” Ív” Ív” Ív” Ív”& Ív”( Ív”) Ív”+ Ív!”0 Ív&”2 Ív(”; Ív1”= Ív3’” ÍE” ÍE’” ÍH”$ ÍHš” ÍH”  ÍH”! Ío”' Ío”( Ío”* Ío”0 Ío”2 Ío”3 Ío”5 Ío!˜” ÍI”" ÍI”* ÍI”, ÍI”1 ÍI”3 ÍI”4 ÍI”6 ÍI!–” ÍI”" ÍI”# Ík”* Ík”+ Ík”- Ík–” ÍI”" ÍI”# Íl”2 Íl”3 Íl”< Íl(–” ÍI”" ÍI”# Ím”/ Ím”0 Ím”1 Ím˜” ÍJ”  ÍJ”( ÍJ”1 ÍJ”4 ÍJ!”5 ÍJ"”9 ÍJ&”; ÍJ(–” ÍJ”  ÍJ”! ÍK”) ÍK”* ÍK”, ÍK˜” ÍJ”  ÍJ”! ÍL”+ ÍL”, ÍL”6 ÍL(”7 ÍL)”= ÍL/’” ÍJ” ÍJ” ÍN”  ÍN”( ÍO”3 ÍO”6 ÍO ”7 ÍO!”? ÍO)”Ì@ ÍO*”ÌH ÍO2”ÌI ÍO3”ÌK ÍO5”ÌL ÍO6”ÌP ÍO:›”  ÍP”+ ÍP”. ÍP"”/ ÍP#”8 ÍP,”9 ÍP-”ÌA ÍP5”ÌB ÍP6”ÌD ÍP8”ÌE ÍP9”ÌG ÍP;–” ÍN”  ÍN”! ÍR”) ÍR”* ÍR”, ÍR’” ÍN” ÍNœ” ÍT”  ÍT”( ÍT”1 ÍT”4 ÍT!”5 ÍT"”: ÍT'”ÌC ÍT0”ÌF ÍT3”ÌG ÍT4”ÌO ÍT<”ÌQ ÍT>–” ÍT”  ÍT”! ÍU”) ÍU”* ÍU”, ÍU’” ÍT” ÍTœ” ÍW”  ÍW”( ÍW”0 ÍW”3 ÍW ”4 ÍW!”< ÍW)”ÌE ÍW2”ÌH ÍW5”ÌI ÍW6”ÌP ÍW=”ÌR ÍW?–” ÍW”  ÍW”! ÍX”) ÍX”* ÍX”, ÍX’” ÍW” ÍWœ” ÍZ”  ÍZ”( ÍZ”0 ÍZ”3 ÍZ ”4 ÍZ!”: ÍZ'”ÌC ÍZ0”ÌF ÍZ3”ÌG ÍZ4”ÌQ ÍZ>”ÌS ÍZÌ@–” ÍZ”  ÍZ”! Í[”) Í[”* Í[”, Í[’” ÍZ” ÍZ–” Í]”  Í]”# Í]”$ Í]”* Í]”, Í] ””( Í^”, Í^”4 Í^”ÌD Í^'–”( Í^”, Í^”- Í_”5 Í_”6 Í_”8 Í_ –”( Í^”, Í^”- Í`”6 Í`”7 Í`”Ì@ Í`(’”$ Í^”( Í^‘” Ía‘” Ía”” Íc”" Íc”3 Íc”: Ícš” Íc”" Íc”# Íd”) Íd”* Íd”, Íd”/ Íd”1 Íd!”2 Íd"”4 Íd$Ü ” Íc”" Íc”# Íe”2 Íe"”3 Íe#”6 Íe&”7 Íe'”= Íe-”> Íe.”? Íe/”Ì@ Íe0”ÌI Íe9”ÌJ Íe:”ÌK Íe;”ÌL Íe<”ÌU ÍeÌE˜” Íc”" Íc”# Íf”, Íf”- Íf”2 Íf"”3 Íf#”8 Íf(—” Íc”" Íc”# Íg”* Íg”+ Íg”. Íg”0 Íg ˜”  Íh”$ Íh”% Íh”/ Íh#”0 Íh$”3 Íh'”4 Íh(”5 Íh)’” Íi” Íi’” Íc” Íc’” ÍI” ÍI’” ÍH”  ÍH’” ÍH” ÍHÜ #”/ ÍF
+”3 ÍF”4 ÍF”= ÍF”ÌW Íq
+”ÌX Íq”Ì[ Íq”Ì] Íq!”Ì_ Íq#”Ì` Ír
+”Ìc Ír”Ìf Ír”Ìg Ír”Ìm Ír”Ìn Ír”Ìo Ír”Ìp Ír”Ìv Ír ”Ìw Ír!”Ìx Ír"”Ìy Ír#”Ì Ír)”Ìƒ Ír-”Ì† Ír0”Ì‡ Ír1”Ì‹ Ír5”Ì Ír9”Ì’ Ír<”Ì“ Ír=”Ì› ÍrÌE”ÌŸ ÍrÌI”Ì¢ ÍrÌL”Ì£ ÍrÌM”Ì¬ ÍrÌV”Ì® ÍrÌX’” ÍE” ÍE’” ÍC”' ÍC%’” ÍD” ÍD
+’” Í"” Í"
+‘” Í|ÔrI–§version¤file§sources®sourcesContent¥names¨mappingsÀ‘À‘ÀÜë‘”    ‘”   ‘”   ‘”   ‘”   ‘”   ‘”   ‘”   ‘”   ‘”  	 ‘”  
+ ‘”   ‘”   ‘”   ‘”   ‘”   ‘”   ‘”   ‘”   ‘”   ‘”   ‘”   ‘”   ‘”   ‘”   ‘”   ‘”   ‘”   ‘”   ‘”   ‘”   ‘”   ‘”    ‘”  ! ‘”  " ‘”  # ‘”  $ ‘”  % ‘”  & ‘”  ' ‘”  ( ‘”  ) ‘”  * ‘”  + ‘”  , ‘”  - ‘”  . ‘”  / ‘”  0 ‘”  1 ‘”  2 ‘”  3 ‘”  4 ‘”  5 ‘”  6 ‘”  7 ‘”  8 ‘”  9 ‘”  : ‘”  ; ‘”  < ‘”  = ‘”  > ‘”  ? ‘”  Ì@ ‘”  ÌA ‘”  ÌB ‘”  ÌC ‘”  ÌD ‘”  ÌE ‘”  ÌF ‘”  ÌG ‘”  ÌH ‘”  ÌI ‘”  ÌJ ‘”  ÌK ‘”  ÌL ‘”  ÌM ‘”  ÌN ‘”  ÌO ‘”  ÌP ‘”  ÌQ ‘”  ÌR ‘”  ÌS ‘”  ÌT ‘”  ÌU ‘”  ÌV ‘”  ÌW ‘”  ÌX ‘”  ÌY ‘”  ÌZ ‘”  Ì[ ‘”  Ì\ ‘”  Ì] ‘”  Ì^ ‘”  Ì_ ‘”  Ì` ‘”  Ìa ‘”  Ìb ‘”  Ìc ‘”  Ìd ‘”  Ìe ‘”  Ìf ‘”  Ìg ‘”  Ìh ‘”  Ìi ‘”  Ìj ‘”  Ìk ‘”  Ìl ‘”  Ìm ‘”  Ìn ‘”  Ìo ‘”  Ìp ‘”  Ìq ‘”  Ìr ‘”  Ìs ‘”  Ìt ‘”  Ìu ‘”  Ìv ‘”  Ìw ‘”  Ìx ‘”  Ìy ‘”  Ìz ‘”  Ì{ ‘”  Ì| ‘”  Ì} ‘”  Ì~ ‘”  Ì ‘”  Ì€ ‘”  Ì ‘”  Ì‚ ‘”  Ìƒ ‘”  Ì„ ‘”  Ì… ‘”  Ì† ‘”  Ì‡ ‘”  Ìˆ ‘”  Ì‰ ‘”  ÌŠ ‘”  Ì‹ ‘”  ÌŒ ‘”  Ì ‘”  Ì ‘”  Ì ‘”  Ì ‘”  Ì‘ ‘”  Ì’ ‘”  Ì“ ‘”  Ì” ‘”  Ì• ‘”  Ì– ‘”  Ì— ‘”  Ì˜ ‘”  Ì™ ‘”  Ìš ‘”  Ì› ‘”  Ìœ ‘”  Ì ‘”  Ì ‘”  ÌŸ ‘”  Ì  ‘”  Ì¡ ‘”  Ì¢ ‘”  Ì£ ‘”  Ì¤ ‘”  Ì¥ ‘”  Ì¦ ‘”  Ì§ ‘”  Ì¨ ‘”  Ì© ‘”  Ìª ‘”  Ì« ‘”  Ì¬ ‘”  Ì­ ‘”  Ì® ‘”  Ì¯ ‘”  Ì° ‘”  Ì± ‘”  Ì² ‘”  Ì³ ‘”  Ì´ ‘”  Ìµ ‘”  Ì¶ ‘”  Ì· ‘”  Ì¸ ‘”  Ì¹ ‘”  Ìº ‘”  Ì» ‘”  Ì¼ ‘”  Ì½ ‘”  Ì¾ ‘”  Ì¿ ‘”  ÌÀ ‘”  ÌÁ ‘”  ÌÂ ‘”  ÌÃ ‘”  ÌÄ ‘”  ÌÅ ‘”  ÌÆ ‘”  ÌÇ ‘”  ÌÈ ‘”  ÌÉ ‘”  ÌÊ ‘”  ÌË ‘”  ÌÌ ‘”  ÌÍ ‘”  ÌÎ ‘”  ÌÏ ‘”  ÌĞ ‘”  ÌÑ ‘”  ÌÒ ‘”  ÌÓ ‘”  ÌÔ ‘”  ÌÕ ‘”  ÌÖ ‘”  Ì× ‘”  ÌØ ‘”  ÌÙ ‘”  ÌÚ ‘”  ÌÛ ‘”  ÌÜ ‘”  Ìİ ‘”  ÌŞ ‘”  Ìß ‘”  Ìà ‘”  Ìá ‘”  Ìâ ‘”  Ìã ‘”  Ìä ‘”  Ìå ‘”  Ìæ ‘”  Ìç ‘”  Ìè ‘”  Ìé ‘”  Ìê ‘”  Ìë ‘”  Ìì ‘”  Ìí ‘”  Ìî ‘”  Ìï ‘”  Ìğ ‘”  Ìñ ‘”  Ìò ‘”  Ìó ‘”  Ìô ‘”  Ìõ ‘”  Ìö ‘”  Ì÷ ‘”  Ìø ‘”  Ìù ‘”  Ìú ‘”  Ìû ‘”  Ìü ‘”  Ìı ‘”  Ìş ‘”  Ìÿ ‘”  Í  ‘”  Í ‘”  Í ‘”  Í ‘”  Í ‘”  Í ‘”  Í ‘”  Í ‘”  Í ‘”  Í	 ‘”  Í
+ ‘”  Í ‘”  Í ‘”  Í ‘”  Í ‘”  Í ‘”  Í ‘”  Í ‘”  Í ‘”  Í ‘”  Í ‘”  Í ‘”  Í ‘”  Í ‘”  Í ‘”  Í ‘”  Í ‘”  Í ‘”  Í ‘”  Í ‘”  Í ‘”  Í ‘”  Í  ‘”  Í! ‘”  Í" ‘”  Í# ‘”  Í$ ‘”  Í% ‘”  Í& ‘”  Í' ‘”  Í( ‘”  Í) ‘”  Í* ‘”  Í+ ‘”  Í, ‘”  Í- ‘”  Í. ‘”  Í/ ‘”  Í0 ‘”  Í1 ‘”  Í2 ‘”  Í3 ‘”  Í4 ‘”  Í5 ‘”  Í6 ‘”  Í7 ‘”  Í8 ‘”  Í9 ‘”  Í: ‘”  Í; ‘”  Í< ‘”  Í= ‘”  Í> ‘”  Í? ‘”  Í@ ‘”  ÍA ‘”  ÍB ‘”  ÍC ‘”  ÍD ‘”  ÍE ‘”  ÍF ‘”  ÍG ‘”  ÍH ‘”  ÍI ‘”  ÍJ ‘”  ÍK ‘”  ÍL ‘”  ÍM ‘”  ÍN ‘”  ÍO ‘”  ÍP ‘”  ÍQ ‘”  ÍR ‘”  ÍS ‘”  ÍT ‘”  ÍU ‘”  ÍV ‘”  ÍW ‘”  ÍX ‘”  ÍY ‘”  ÍZ ‘”  Í[ ‘”  Í\ ‘”  Í] ‘”  Í^ ‘”  Í_ ‘”  Í` ‘”  Ía ‘”  Íb ‘”  Íc ‘”  Íd ‘”  Íe ‘”  Íf ‘”  Íg ‘”  Íh ‘”  Íi ‘”  Íj ‘”  Ík ‘”  Íl ‘”  Ím ‘”  Ín ‘”  Ío ‘”  Íp ‘”  Íq ‘”  Ír ‘”  Ís ‘”  Ít ‘”  Íu ‘”  Ív ‘”  Íw ‘”  Íx ‘”  Íy ‘”  Íz ‘”  Í{ ‘”  Í| ‘”  Í} ‘”  Í~ ‘”  Í ‘”  Í€ ‘”  Í ‘”  Í‚ ‘”  Íƒ ‘”  Í„ ‘”  Í… ‘”  Í† ‘”  Í‡ ‘”  Íˆ ‘”  Í‰ ‘”  ÍŠ ‘”  Í‹ ‘”  ÍŒ ‘”  Í ‘”  Í ‘”  Í ‘”  Í ‘”  Í‘ ‘”  Í’ ‘”  Í“ ‘”  Í” ‘”  Í• ‘”  Í– ‘”  Í— ‘”  Í˜ ‘”  Í™ ‘”  Íš ‘”  Í› ‘”  Íœ ‘”  Í ‘”  Í ‘”  ÍŸ ‘”  Í  ‘”  Í¡ ‘”  Í¢ ‘”  Í£ ‘”  Í¤ ‘”  Í¥ ‘”  Í¦ ‘”  Í§ ‘”  Í¨ ‘”  Í© ‘”  Íª ‘”  Í« ‘”  Í¬ ‘”  Í­ ‘”  Í® ‘”  Í¯ ‘”  Í° ‘”  Í± ‘”  Í² ‘”  Í³ ‘”  Í´ ‘”  Íµ ‘”  Í¶ ‘”  Í· ‘”  Í¸ ‘”  Í¹ ‘”  Íº ‘”  Í» ‘”  Í¼ ‘”  Í½ ‘”  Í¾ ‘”  Í¿ ‘”  ÍÀ ‘”  ÍÁ ‘”  ÍÂ ‘”  ÍÃ ‘”  ÍÄ ‘”  ÍÅ ‘”  ÍÆ ‘”  ÍÇ ‘”  ÍÈ ‘”  ÍÉ ‘”  ÍÊ ‘”  ÍË ‘”  ÍÌ ‘”  ÍÍ ‘”  ÍÎ ‘”  ÍÏ ‘”  ÍĞ ‘”  ÍÑ ‘”  ÍÒ ‘”  ÍÓ ‘”  ÍÔ ‘”  ÍÕ ‘”  ÍÖ ‘”  Í× ‘”  ÍØ ‘”  ÍÙ ‘”  ÍÚ ‘”  ÍÛ ‘”  ÍÜ ‘”  Íİ ‘”  ÍŞ ‘”  Íß ‘”  Íà ‘”  Íá ‘”  Íâ ‘”  Íã ‘”  Íä ‘”  Íå ‘”  Íæ ‘”  Íç ‘”  Íè ‘”  Íé ‘”  Íê ÔrJ’§missing¦pluginÃ¦genAbcÂÔ  ÔrK”²dynamicImportCache¹exportAllDeclarationCache»exportNamedDeclarationCache«importCache‘ÔrL•¤type¥start£endªspecifiers¦source±ImportDeclarationÌÏÌù‘ÔrM”¤type¥start£end¥local¶ImportDefaultSpecifierÌÖÌàÔrN”¤type¥start£end¤nameªIdentifierÌÖÌàªusbManagerÔrO•¤type¥start£end¥value£raw§LiteralÌæÌø°@ohos.usbManager²"@ohos.usbManager"
